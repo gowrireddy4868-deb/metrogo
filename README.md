@@ -177,3 +177,5 @@ components/
 Real Stripe payments and the deployment path were the two biggest gaps — both are now actually
 done (Stripe) or fully prepped with exact steps (deployment). Want help actually walking through
 the PlanetScale + Vercel deploy next, once you're ready?
+#   M e t r o G o  
+ 
