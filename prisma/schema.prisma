@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  RIDER
+  STAFF
+  ADMIN
+}
+
+enum TicketType {
+  SINGLE
+  RETURN
+}
+
+enum TicketStatus {
+  AWAITING_PAYMENT
+  ISSUED
+  IN_TRANSIT
+  COMPLETED
+  EXPIRED
+  REFUNDED
+  VOID
+}
+
+enum PassType {
+  DAY
+  WEEK
+  MONTH
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model Station {
+  id        String   @id @default(uuid())
+  name      String
+  city      String   @default("Bengaluru")
+  zone      Int
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
+
+  lines           LineStation[]
+  ticketsAsSource Ticket[]      @relation("SourceStation")
+  ticketsAsDest   Ticket[]      @relation("DestStation")
+  ticketsAsEntry  Ticket[]      @relation("EntryStation")
+
+  @@unique([name, city])
+}
+
+model Line {
+  id       String        @id @default(uuid())
+  name     String        @unique
+  colorHex String
+  stations LineStation[]
+}
+
+model LineStation {
+  id        String  @id @default(uuid())
+  lineId    String
+  stationId String
+  sequence  Int
+  line      Line    @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  station   Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  @@unique([lineId, stationId])
+  @@index([stationId])
+}
+
+model FareRule {
+  id             String  @id @default(uuid())
+  fromZone       Int
+  toZone         Int
+  baseFare       Decimal @db.Decimal(10, 2)
+  peakMultiplier Decimal @db.Decimal(4, 2) @default(1.0)
+  currency       String  @default("INR")
+
+  @@unique([fromZone, toZone])
+}
+
+model DiscountRule {
+  id                   String  @id @default(uuid())
+  category             String
+  discountPct          Decimal @db.Decimal(5, 2)
+  requiresVerification Boolean @default(true)
+
+  @@unique([category])
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  name                  String
+  email                 String    @unique
+  phone                 String?   @unique
+  passwordHash          String
+  role                  Role      @default(RIDER)
+  discountCategory      String?
+  isVerified            Boolean   @default(false)
+  emailVerified         Boolean   @default(false)
+  emailVerifyToken      String?   @unique @db.VarChar(128)
+  emailVerifyExpiry     DateTime?
+  passwordResetToken    String?   @unique @db.VarChar(128)
+  passwordResetExpiry   DateTime?
+  rewardPoints          Int       @default(0)
+  bookingStreak         Int       @default(0)
+  lastBookingDate       DateTime?
+  lastLoginAt           DateTime?
+  notifyStreakReminder  Boolean   @default(true)
+  notifyPassExpiry      Boolean   @default(true)
+  refreshToken          String?   @unique @db.VarChar(512)
+  refreshTokenExpiry    DateTime?
+  createdAt             DateTime  @default(now())
+
+  tickets Ticket[]
+  passes  Pass[]
+}
+
+model Ticket {
+  id              String       @id @default(uuid())
+  userId          String?
+  guestEmail      String?
+  type            TicketType
+  sourceStationId String
+  destStationId   String
+  fareAmount      Decimal      @db.Decimal(10, 2)
+  paymentMethod   String       @default("CARD")
+  status          TicketStatus @default(ISSUED)
+  qrToken         String       @unique @db.VarChar(512)
+  entryStationId  String?
+  entryTime       DateTime?
+  exitTime        DateTime?
+  expiresAt       DateTime
+  createdAt       DateTime     @default(now())
+
+  user          User?    @relation(fields: [userId], references: [id])
+  sourceStation Station  @relation("SourceStation", fields: [sourceStationId], references: [id])
+  destStation   Station  @relation("DestStation", fields: [destStationId], references: [id])
+  entryStation  Station? @relation("EntryStation", fields: [entryStationId], references: [id])
+  payment       Payment?
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum PassStatus {
+  AWAITING_PAYMENT
+  ACTIVE
+  REFUNDED
+  VOID
+}
+
+model Pass {
+  id         String     @id @default(uuid())
+  userId     String
+  type       PassType
+  status     PassStatus @default(ACTIVE)
+  validFrom  DateTime
+  validTo    DateTime
+  usageCount Int        @default(0)
+  qrToken    String     @unique @db.VarChar(512)
+  createdAt  DateTime   @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  payment Payment?
+
+  @@index([userId])
+}
+
+model Payment {
+  id           String        @id @default(uuid())
+  ticketId     String?       @unique
+  passId       String?       @unique
+  amount       Decimal       @db.Decimal(10, 2)
+  gateway      String
+  gatewayRefId String
+  status       PaymentStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+
+  ticket Ticket? @relation(fields: [ticketId], references: [id])
+  pass   Pass?   @relation(fields: [passId], references: [id])
+}
+
+model ValidationLog {
+  id             String   @id @default(uuid())
+  ticketOrPassId String
+  gateId         String
+  gateType       String
+  result         String
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@index([ticketOrPassId])
+}

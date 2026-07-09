@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* ── Light mode (default) ── */
+:root {
+  --ink: #0b1320;
+  --ink-soft: #16213a;
+  --paper: #eef1f6;
+  --paper-card: #ffffff;
+  --signal: #ffc83d;
+  --signal-ink: #5c4400;
+  --line-rule: #d7dce5;
+  --text-main: #0b1320;
+  --text-mute: #5b6678;
+}
+
+/* ── Dark mode ── */
+[data-theme="dark"] {
+  --ink: #ffc83d;
+  --ink-soft: #e6b535;
+  --paper: #0d1117;
+  --paper-card: #161b22;
+  --signal: #ffc83d;
+  --signal-ink: #0d1117;
+  --line-rule: #21262d;
+  --text-main: #e6edf3;
+  --text-mute: #8b949e;
+}
+
+body {
+  background: var(--paper);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  transition: background 0.2s, color 0.2s;
+}
+
+/* Departure-board style numerals */
+.board-num {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* Signage band: always dark regardless of theme */
+.signage-band {
+  background: linear-gradient(180deg, #0b1320 0%, #16213a 100%);
+}
+
+/* White cards in dark mode become dark cards */
+[data-theme="dark"] .bg-white {
+  background-color: var(--paper-card) !important;
+}
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-slate-300 {
+  border-color: var(--line-rule) !important;
+}
+
+/* Perforated ticket-stub edge */
+.ticket-stub::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% + 4px);
+  height: 20px;
+  background-image: radial-gradient(circle, var(--paper) 6px, transparent 6.5px);
+  background-size: 20px 20px;
+  background-position: center;
+  background-repeat: repeat-x;
+}
+
+/* Print styles */
+@media print {
+  nav, header, footer { display: none !important; }
+  #ticket-printable {
+    box-shadow: none !important;
+    border-width: 1px !important;
+  }
+}
