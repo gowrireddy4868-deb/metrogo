@@ -16,8 +16,6 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({ where: { id: payload.userId } });
   if (!user || user.refreshToken !== refreshToken) {
-    // Token rotation — if the stored token doesn't match, it may have been stolen
-    // and already rotated. Invalidate all sessions for this user.
     if (user) {
       await prisma.user.update({
         where: { id: user.id },
@@ -31,7 +29,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "token_expired" }, { status: 401 });
   }
 
-  // Rotate: issue a brand-new refresh token and invalidate the old one
   const newRefreshToken = signRefreshToken(user.id);
   const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60_000);
 
@@ -40,7 +37,12 @@ export async function POST(req: NextRequest) {
     data: { refreshToken: newRefreshToken, refreshTokenExpiry: newExpiry },
   });
 
-  const accessToken = signAccessToken({ userId: user.id, role: user.role, name: user.name, email: user.email });
+  const accessToken = signAccessToken({
+    userId: user.id,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+  });
 
   return NextResponse.json({
     token: accessToken,
