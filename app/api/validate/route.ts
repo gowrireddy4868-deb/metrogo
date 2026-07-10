@@ -20,7 +20,6 @@ async function logAndRespond(
 }
 
 export async function POST(req: NextRequest) {
-  // 60 validations per minute per gate IP — enough for a real gate, blocks abuse
   const ip = getClientIp(req);
   const rl = rateLimit(`validate:${ip}`, 60, 60_000);
   if (!rl.allowed) {
@@ -83,7 +82,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // TICKET flow
   const ticket = await prisma.ticket.findUnique({ where: { id: payload.id } });
   if (!ticket) {
     return logAndRespond(payload.id, gateId, gateType, "fail", "ticket_not_found", "deny");
@@ -124,7 +122,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // exit
   if (ticket.status !== "IN_TRANSIT") {
     return logAndRespond(
       ticket.id,
@@ -137,7 +134,7 @@ export async function POST(req: NextRequest) {
   }
 
   const exitStationId = gateStationId || ticket.destStationId;
-  const [entryStation, exitStation, fareRules, discountRules] = await Promise.all([
+  const [entryStation, exitStation, fareRulesRaw, discountRulesRaw] = await Promise.all([
     ticket.entryStationId
       ? prisma.station.findUnique({ where: { id: ticket.entryStationId } })
       : null,
@@ -145,6 +142,8 @@ export async function POST(req: NextRequest) {
     prisma.fareRule.findMany(),
     prisma.discountRule.findMany(),
   ]);
+  const fareRules = fareRulesRaw.map((r) => ({ ...r, baseFare: Number(r.baseFare), peakMultiplier: Number(r.peakMultiplier) }));
+  const discountRules = discountRulesRaw.map((r) => ({ ...r, discountPct: Number(r.discountPct) }));
 
   if (entryStation && exitStation) {
     const { fare: actualFare } = calculateFare(

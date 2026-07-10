@@ -55,10 +55,12 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date();
-  const [fareRules, discountRules] = await Promise.all([
+  const [fareRulesRaw, discountRulesRaw] = await Promise.all([
     prisma.fareRule.findMany(),
     prisma.discountRule.findMany(),
   ]);
+  const fareRules = fareRulesRaw.map((r) => ({ ...r, baseFare: Number(r.baseFare), peakMultiplier: Number(r.peakMultiplier) }));
+  const discountRules = discountRulesRaw.map((r) => ({ ...r, discountPct: Number(r.discountPct) }));
 
   const { fare } = calculateFare(
     fareRules,
@@ -77,7 +79,6 @@ export async function POST(req: NextRequest) {
 
   const useRealStripe = paymentMethod === "CARD" && isStripeConfigured();
 
-  // ---- Real payment path: Stripe (card only, test mode) ----
   if (useRealStripe) {
     const ticket = await prisma.ticket.create({
       data: {
@@ -95,7 +96,6 @@ export async function POST(req: NextRequest) {
     });
 
     const stripe = getStripe();
-    // Stripe expects the smallest currency unit (paise for INR).
     const amountInPaise = Math.round(totalFare * 100);
 
     const paymentIntent = await stripe.paymentIntents.create({
@@ -123,7 +123,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ---- Mock path: UPI / Wallet, or Card with no Stripe keys configured ----
   const created = await prisma.ticket.create({
     data: {
       userId: dbUser?.id || null,

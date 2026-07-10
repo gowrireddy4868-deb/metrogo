@@ -43,7 +43,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "no_route_found" }, { status: 404 });
   }
 
-  // discount lookup (optional, if logged in)
   let discountCategory: string | null = null;
   let isVerified = false;
   const token = getTokenFromHeader(req.headers.get("authorization"));
@@ -58,10 +57,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const [fareRules, discountRules] = await Promise.all([
+  const [fareRulesRaw, discountRulesRaw] = await Promise.all([
     prisma.fareRule.findMany(),
     prisma.discountRule.findMany(),
   ]);
+
+  const fareRules = fareRulesRaw.map((r) => ({
+    ...r,
+    baseFare: Number(r.baseFare),
+    peakMultiplier: Number(r.peakMultiplier),
+  }));
+  const discountRules = discountRulesRaw.map((r) => ({
+    ...r,
+    discountPct: Number(r.discountPct),
+  }));
 
   const { fare, peakApplied, baseFare } = calculateFare(
     fareRules,
