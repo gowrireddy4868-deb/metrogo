@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     data: { refreshToken: newRefreshToken, refreshTokenExpiry: newExpiry },
   });
 
-  const accessToken = signAccessToken({ userId: user.id, role: user.role });
+  const accessToken = signAccessToken({ userId: user.id, role: user.role, name: user.name, email: user.email });
 
   return NextResponse.json({
     token: accessToken,
