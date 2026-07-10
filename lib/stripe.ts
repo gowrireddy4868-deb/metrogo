@@ -10,7 +10,7 @@ export function getStripe(): Stripe {
       "STRIPE_SECRET_KEY is not set. Add it to .env to enable real card payments."
     );
   }
-  return new Stripe(secretKey, { apiVersion: "2025-09-30.clover" });
+  return new Stripe(secretKey, { apiVersion: "2025-02-24.acacia" });
 }
 
 export function isStripeConfigured(): boolean {
