@@ -1,18 +1,24 @@
-import nodemailer from "nodemailer";
-
-const FROM = process.env.SMTP_FROM || "MetroGo <noreply@metrogo.app>";
 const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+const FROM = "MetroGo <onboarding@resend.dev>";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-function getTransporter() {
-  const host = process.env.SMTP_HOST;
-  if (!host) return null;
-  const port = Number(process.env.SMTP_PORT || 587);
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
+async function send(to: string, subject: string, html: string) {
+  if (RESEND_API_KEY) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from: FROM, to, subject, html }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Resend error: ${err}`);
+    }
+    return;
+  }
+  console.log(`[email:mock] "${subject}" → ${to}`);
 }
 
 function wrap(body: string): string {
@@ -24,13 +30,6 @@ function wrap(body: string): string {
   </div>`;
 }
 
-async function send(to: string, subject: string, html: string) {
-  const t = getTransporter();
-  if (!t) { console.log(`[email:mock] "${subject}" → ${to}`); return; }
-  await t.sendMail({ from: FROM, to, subject, html });
-}
-
-// ── Ticket confirmation ──────────────────────────────────────────────────────
 export async function sendTicketConfirmationEmail(p: {
   to: string; passengerName: string; fromStation: string;
   toStation: string; fare: number; ticketId: string; expiresAt: string;
@@ -49,7 +48,6 @@ export async function sendTicketConfirmationEmail(p: {
   `));
 }
 
-// ── Email verification ───────────────────────────────────────────────────────
 export async function sendVerificationEmail(p: { to: string; name: string; verifyUrl: string }) {
   await send(p.to, "Verify your MetroGo email address", wrap(`
     <p style="color:#0b1320;font-size:15px">Hi ${p.name},</p>
@@ -61,7 +59,6 @@ export async function sendVerificationEmail(p: { to: string; name: string; verif
   `));
 }
 
-// ── Password reset ───────────────────────────────────────────────────────────
 export async function sendPasswordResetEmail(p: { to: string; name: string; resetUrl: string }) {
   await send(p.to, "Reset your MetroGo password", wrap(`
     <p style="color:#0b1320;font-size:15px">Hi ${p.name},</p>
@@ -69,26 +66,24 @@ export async function sendPasswordResetEmail(p: { to: string; name: string; rese
     <div style="text-align:center;margin:28px 0">
       <a href="${p.resetUrl}" style="background:#0b1320;color:#FFC83D;padding:14px 32px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;display:inline-block">Reset password</a>
     </div>
-    <p style="color:#8b96a5;font-size:12px">If you didn't request this, ignore this email — your password won't change.</p>
+    <p style="color:#8b96a5;font-size:12px">If you didn't request this, ignore this email.</p>
   `));
 }
 
-// ── Streak reminder ──────────────────────────────────────────────────────────
 export async function sendStreakReminderEmail(to: string, name: string, streak: number) {
   await send(to, `Don't break your ${streak}-day streak! 🔥`, wrap(`
     <p style="color:#0b1320;font-size:15px">Hi ${name},</p>
-    <p style="color:#5b6678;font-size:14px">You have a <strong>${streak}-day booking streak</strong> — but you haven't booked today yet. Book before midnight to keep it going!</p>
+    <p style="color:#5b6678;font-size:14px">You have a <strong>${streak}-day booking streak</strong> — book before midnight to keep it going!</p>
     <div style="text-align:center;margin:28px 0">
       <a href="${APP_URL}" style="background:#FFC83D;color:#0b1320;padding:14px 32px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;display:inline-block">Book a ticket now →</a>
     </div>
   `));
 }
 
-// ── Pass expiry reminder ─────────────────────────────────────────────────────
 export async function sendPassExpiryEmail(to: string, name: string, passType: string, expiresAt: Date) {
   await send(to, `Your MetroGo ${passType} Pass expires soon`, wrap(`
     <p style="color:#0b1320;font-size:15px">Hi ${name},</p>
-    <p style="color:#5b6678;font-size:14px">Your <strong>${passType} Pass</strong> expires on <strong>${expiresAt.toLocaleDateString()}</strong>. Renew it now to keep travelling without interruption.</p>
+    <p style="color:#5b6678;font-size:14px">Your <strong>${passType} Pass</strong> expires on <strong>${expiresAt.toLocaleDateString()}</strong>.</p>
     <div style="text-align:center;margin:28px 0">
       <a href="${APP_URL}/passes" style="background:#0b1320;color:#FFC83D;padding:14px 32px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;display:inline-block">Renew pass →</a>
     </div>
