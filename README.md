@@ -1,181 +1,155 @@
-# MetroGo — Metro Ticket Booking Website
+# MetroGo 🚇
 
-A metro ticket booking platform with **real Stripe payments (test mode)**, multi-city journey
-planning, encrypted QR tickets, a staff gate-scanning simulator, rewards/streaks, an AI support
-chatbot, and an admin dashboard with analytics and fraud detection — backed by real MySQL.
+A full-stack metro ticket booking platform for Indian cities — built with Next.js, MySQL, Prisma, Stripe, and Claude AI.
 
-## What's implemented
+**Live Demo:** https://metrogo-production.up.railway.app
 
-**Booking & travel**
-- Multi-city journey planner — pick a city, then station, with multi-line routing, zone-based
-  fares, peak-hour pricing
-- **Real Stripe payments (test mode)** for Card checkout — actual `PaymentIntent` creation,
-  Stripe Elements card form, and webhook-confirmed ticket issuance (see "Payments" below).
-  UPI/Wallet remain simulated (no Razorpay/PhonePe business integration — out of scope for now)
-- **AES-256-GCM encrypted QR tickets** — not just signed, actually encrypted; tampering is
-  auto-detected
-- Gate validation simulator (`/staff/scan`) — entry/exit state machine, duplicate-use prevention
-- Passes (day/week/month), refunds, email confirmation (SMTP or console fallback)
-- Booking streaks & reward points (`/rewards`)
-- Live train tracking (`/live`) — simulated, schedule-based (no public GPS feed exists to use)
-- Peak-hour crowd prediction — computed from real historical booking data
-- AI support chatbot — real Claude API if `ANTHROPIC_API_KEY` set, rule-based fallback otherwise
+---
 
-**Admin dashboard** (`/admin`)
-- Revenue/booking trend charts, active users, station-wise bookings
-- Fraud detection (`/admin/fraud`) — flags repeated failed gate-validation attempts
-- Validation history (`/admin/validations`) — paginated audit log
-- CSV export — tickets, validations, users
+## What it does
 
-## Payments — how the real Stripe flow works
+- Plan journeys across 6 Indian cities (Bengaluru, Chennai, Delhi, Mumbai, Hyderabad, Kolkata)
+- Book single or return tickets with zone-based fare calculation and peak-hour pricing
+- Pay with Card (real Stripe test-mode), UPI, or Wallet
+- Get an AES-256-GCM encrypted QR code ticket via email and on-screen
+- Scan QR at gate (entry/exit state machine with fraud detection)
+- Buy Day/Week/Month unlimited passes
+- Earn reward points and daily booking streaks
+- AI support chatbot powered by Claude API
+- Full admin dashboard with revenue charts, fraud detection, CSV export
 
-1. You add test-mode Stripe keys to `.env` (free Stripe account required — see setup below)
-2. Checkout creates a real `PaymentIntent` server-side, returns its `client_secret`
-3. The browser collects card details via Stripe's own hosted Elements UI (your server never
-   touches raw card numbers)
-4. **The ticket is only marked `ISSUED` and given a real QR code when Stripe's webhook confirms
-   the charge succeeded** — not when the browser says it succeeded. This is what makes the flow
-   safe against someone closing their tab mid-payment or tampering with the client response.
-5. Use Stripe's test card `4242 4242 4242 4242`, any future expiry, any CVC — it always succeeds
-   in test mode, no real money moves.
+---
 
-**Without Stripe keys configured**, Card/UPI/Wallet all fall back to a simulated "always
-succeeds" mock — the app still fully works for demoing, just without real payment processing.
+## Tech Stack
 
-## Setup
+| | |
+|---|---|
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS |
+| Backend | Next.js API Routes |
+| Database | MySQL 8.0 + Prisma ORM |
+| Auth | JWT access tokens (12h) + refresh tokens (30d) with rotation |
+| Payments | Stripe (test mode) |
+| Email | Brevo API |
+| AI | Anthropic Claude API |
+| QR | AES-256-GCM encrypted |
+| Hosting | Railway |
 
-### 1. MySQL
+---
 
-```sql
-CREATE DATABASE metro_booking;
-```
+## Features
+
+**Riders**
+- Multi-city journey planner with BFS multi-line routing
+- Peak-hour fare surcharge + crowd level prediction
+- Single & return tickets, guest checkout (no login needed)
+- Download / Share / Print QR ticket
+- Ticket history with search and date filter
+- Day/Week/Month passes
+- Reward points, streaks, Bronze/Silver/Gold/Platinum tiers
+- Email confirmations, verification, password reset
+- Dark mode, profile page
+
+**Staff**
+- Gate scanner with camera QR scanning
+- Entry → Exit state machine, duplicate-use prevention
+- Fare shortfall detection on exit
+
+**Admin**
+- Revenue & booking trend charts (14 days)
+- Active users, station-wise bookings, ticket status breakdown
+- Fraud detection (repeated failed gate scans)
+- Full validation audit log with pagination
+- CSV export (tickets, validations, users)
+
+---
+
+## Cities & Network
+
+| City | Lines | Stations |
+|---|---|---|
+| Bengaluru | Blue, Green, Purple | 38 |
+| Chennai | Blue, Green | 31 |
+| Delhi | Yellow, Blue | 74 |
+| Mumbai | Aqua, Orange | 29 |
+| Hyderabad | Red, Blue | 52 |
+| Kolkata | Blue | 25 |
+
+---
+
+## Local Setup
 
 ```bash
-cp .env.example .env
-```
-Edit `.env`:
-```
-DATABASE_URL="mysql://root:yourpassword@localhost:3306/metro_booking"
-JWT_ACCESS_SECRET="any-long-random-string"
-QR_SIGNING_SECRET="a-different-long-random-string"
-```
+# 1. Clone the repo
+git clone https://github.com/gowrireddy4868-deb/metrogo.git
+cd metrogo
 
-### 2. Install & set up the database
-
-```bash
+# 2. Install dependencies
 npm install
-```
-> If `npm install` shows a `prisma generate` error at the end — that's a network blip on the
-> Prisma binary download, not a real failure. Just run `npx prisma generate` again manually.
 
-```bash
+# 3. Set up environment variables
+copy .env.example .env
+# Fill in your values (see .env.example)
+
+# 4. Set up database
+npx prisma generate
 npx prisma db push --force-reset
 npm run db:seed
-```
 
-### 3. (Optional but recommended) Enable real Stripe payments
-
-1. Go to https://dashboard.stripe.com/register and create a free account (no business
-   verification needed for test mode)
-2. Go to https://dashboard.stripe.com/test/apikeys and copy your **Publishable key** and
-   **Secret key**
-3. Add to `.env`:
-   ```
-   STRIPE_SECRET_KEY="sk_test_..."
-   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
-   ```
-4. For **local testing**, install the Stripe CLI (https://docs.stripe.com/stripe-cli) and run:
-   ```bash
-   stripe listen --forward-to localhost:3000/api/payments/webhook
-   ```
-   It'll print a webhook signing secret starting `whsec_...` — add that to `.env` as
-   `STRIPE_WEBHOOK_SECRET`. Keep this `stripe listen` command running in a separate terminal
-   whenever you test card payments locally — without it, the webhook never fires and tickets
-   will stay stuck on "Waiting for payment confirmation."
-
-### 4. (Optional) Email confirmations & AI chatbot
-
-See the commented-out blocks in `.env.example` for `SMTP_*` and `ANTHROPIC_API_KEY`.
-
-### 5. Run it
-
-```bash
+# 5. Run
 npm run dev
 ```
-Open http://localhost:3000.
 
-## Demo accounts (password for all: `Test@1234`)
+Open http://localhost:3000
 
-| Email | Role | Lands on login |
-|---|---|---|
-| rider@metro.test | Rider | Homepage |
-| staff@metro.test | Gate staff | `/staff/scan` |
-| admin@metro.test | Admin | `/admin` |
+---
 
-## Deploying for real (the part I can't do for you)
+## Environment Variables
 
-I can't create accounts on your behalf — Vercel and a hosted MySQL provider both need you to
-sign up. But the project is ready to deploy as-is once you do. Recommended free-tier path:
-
-1. **Push this project to a GitHub repo** (private is fine)
-2. **Database — PlanetScale or Railway** (both have MySQL-compatible free tiers):
-   - Create a database, copy its connection string into `DATABASE_URL`
-   - From your local machine (pointed at the new remote DB), run:
-     ```bash
-     npx prisma db push
-     npm run db:seed
-     ```
-3. **App — Vercel** (https://vercel.com):
-   - Import your GitHub repo
-   - Add all your `.env` variables in Vercel's Environment Variables settings (same keys,
-     production values)
-   - Deploy — Vercel runs `npm install` (which runs `prisma generate` automatically) and
-     `npm run build` for you
-4. **Stripe webhook in production**: in the Stripe dashboard, go to Developers → Webhooks → Add
-   endpoint, point it at `https://your-vercel-url.vercel.app/api/payments/webhook`, select the
-   `payment_intent.succeeded` and `payment_intent.payment_failed` events, and copy the new
-   signing secret into Vercel's `STRIPE_WEBHOOK_SECRET` (it's different from your local one)
-5. **Go live for real**: switch Stripe from test mode to live mode in their dashboard (requires
-   their standard business verification) and swap in live API keys — only do this once you're
-   actually ready to accept real money.
-
-## Project structure
-
-```
-prisma/schema.prisma, seed.ts
-app/
-  page.tsx, checkout/, tickets/, passes/, rewards/, live/, staff/scan/, admin/, auth/
-  api/
-    stations, lines, cities, journey         Trip planning
-    auth/                                     Signup/login
-    tickets/, passes/                         Booking + lifecycle
-    payments/webhook/                         Stripe webhook (source of truth for payment status)
-    validate/                                 Gate entry/exit logic
-    crowd/, chat/, users/me/
-    admin/                                    stats, fraud, validations, export
-lib/
-  prisma.ts, fareEngine.ts, routeFinder.ts, qrSigner.ts (AES-256-GCM),
-  rewards.ts, email.ts, faqBot.ts, auth.ts, apiClient.ts, stripe.ts
-components/
-  Navbar, RoleBanner, TrainIllustration, StationPicker, CitySelector,
-  LineSchematic, CrowdBadge, BarChart, ChatWidget, StripeCardForm
+```env
+DATABASE_URL="mysql://root:password@localhost:3306/metro_booking"
+JWT_ACCESS_SECRET="..."
+JWT_REFRESH_SECRET="..."
+QR_SIGNING_SECRET="..."
+APP_URL="http://localhost:3000"
+NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+BREVO_API_KEY="..."          # Email delivery
+ANTHROPIC_API_KEY="..."      # AI chatbot (optional)
+STRIPE_SECRET_KEY="..."      # Real card payments (optional)
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="..."
+STRIPE_WEBHOOK_SECRET="..."
+ADMIN_EMAIL="your@email.com"
+CRON_SECRET="..."
 ```
 
-## What's still not done (being honest)
+---
 
-1. **UPI/Wallet are still mocked** — only Card goes through real Stripe. Real UPI needs a
-   Razorpay/PhonePe business account (India-specific, separate integration).
-2. **Live tracking is simulated** — schedule math, not GPS (no public feed exists for a demo).
-3. **No admin CRUD** — can't add/edit stations/lines/fares from the UI yet.
-4. **No discount-verification UI** — fields exist, nothing to request/approve them yet.
-5. **No refresh-token rotation** — 12h access tokens only.
-6. **Not deployed anywhere** — see "Deploying for real" above; that part needs your own
-   accounts, which I can't create for you.
-7. **No automated tests, no rate limiting, no secrets rotation** — fine for a personal/learning
-   project, not yet hardened for hostile traffic at scale.
+## Security
 
-Real Stripe payments and the deployment path were the two biggest gaps — both are now actually
-done (Stripe) or fully prepped with exact steps (deployment). Want help actually walking through
-the PlanetScale + Vercel deploy next, once you're ready?
-#   M e t r o G o  
- 
+- Passwords hashed with bcrypt
+- JWT with refresh token rotation and reuse detection
+- AES-256-GCM QR encryption (not just signed — contents unreadable)
+- Rate limiting on login, signup, and gate validation
+- Stripe webhook signature verification
+- Admin access locked to a specific email
+
+---
+
+## What's simulated
+
+Being transparent about what's not fully real yet:
+
+- **UPI/Wallet** — UI exists, always succeeds (no Razorpay integration)
+- **Live train tracking** — schedule-based math, not real GPS
+- **Admin CRUD** — dashboard is read-only (can't add stations/fares from UI)
+
+---
+
+## Screenshots
+
+> Coming soon
+
+---
+
+## License
+
+MIT
