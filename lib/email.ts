@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 
 const FROM = process.env.SMTP_FROM || "MetroGo <noreply@metrogo.app>";
-const APP_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 function getTransporter() {
   const host = process.env.SMTP_HOST;
