@@ -1,20 +1,25 @@
 const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-const FROM = "MetroGo <onboarding@resend.dev>";
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM = "MetroGo <gowrireddy4868@gmail.com>";
 
 async function send(to: string, subject: string, html: string) {
-  if (RESEND_API_KEY) {
-    const res = await fetch("https://api.resend.com/emails", {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (apiKey) {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "api-key": apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: FROM, to, subject, html }),
+      body: JSON.stringify({
+        sender: { name: "MetroGo", email: "gowrireddy4868@gmail.com" },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`Resend error: ${err}`);
+      throw new Error(`Brevo error: ${err}`);
     }
     return;
   }
